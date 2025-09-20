@@ -1,0 +1,55 @@
+trigger: none
+
+pool:
+  name: localubuntu
+
+stages:
+  - stage: 'build_stage'
+    jobs:
+      - job: buildJob
+        steps:
+          - task: Maven@4
+            displayName: "Build WAR using Maven"
+            inputs:
+              mavenPomFile: 'mywebapp/pom.xml'
+              goals: 'package'
+              options: '-DskipTests'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              javaHomeOption: 'JDKVersion'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+
+          - task: PublishBuildArtifacts@1
+            displayName: "Publish WAR"
+            inputs:
+              PathtoPublish: 'mywebapp/target/mywebapp.war'
+              ArtifactName: 'drop'
+              publishLocation: 'container'
+
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'kiranacr'
+              repository: 'kiranacr/webapp'
+              command: 'buildAndPush'
+              Dockerfile: 'mywebapp/Dockerfile'
+              buildContext: 'mywebapp'
+
+  - stage: Deploy
+    displayName: "Deploy to Azure Web App Container"
+    dependsOn: build_stage
+    jobs:
+      - deployment: DeployWebApp
+        environment: 'dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebAppContainer@1
+                  displayName: "Deploy to Azure Web App"
+                  inputs:
+                    azureSubscription: 'kiranacrRM'
+                    appName: 'Kiran_app'
+                    imageName: 'kiranacr/webapp:latest'
