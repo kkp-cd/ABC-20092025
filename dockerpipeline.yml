@@ -1,0 +1,40 @@
+trigger: none
+
+pool:
+  name: Localubuntu
+
+stages:
+- stage: MavenBuildAndDeploy
+  displayName: 'Build and Deploy'
+  jobs:
+    - job: MavenBuild
+      displayName: 'Build with Maven and Push'
+      steps:
+
+      - task: Checkout@1
+        displayName: 'Checkout Code'
+
+      - task: Maven@3
+        displayName: 'Build the WAR'
+        inputs:
+          mavenPomFile: 'mywebapp/pom.xml'
+          goals: 'clean package'
+
+      - task: Maven@3
+        displayName: 'Push to Azure Artifacts'
+        inputs:
+          mavenPomFile: 'mywebapp/pom.xml'
+          goals: 'deploy'
+          options: '-DartifactId=webapp -Dversion=version1'
+          mavenAuthenticateFeed: true
+
+      - task: Docker@2
+        displayName: 'Build and Push Docker Image'
+        inputs:
+          containerRegistry: kiranacr
+          repository: dockerimage
+          command: buildAndPush
+          Dockerfile: mywebapp/Dockerfile
+          buildContext: webapp
+          tags: |
+            latest
